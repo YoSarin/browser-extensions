@@ -4,12 +4,13 @@ A collection of browser extensions, primarily targeting Microsoft Edge.
 
 ## Extensions
 
-### [ms-favicon](./ms-favicon/)
+### [ms-qol-improvements](./ms-qol-improvements/)
 
-Changes favicons on Microsoft pages to better reflect the current page context:
+Quality-of-life improvements for Microsoft web apps:
 
 - **Azure Portal** – replaces the generic favicon with the SVG icon of the currently active blade
 - **Azure DevOps** – sets context-aware favicons for pipelines (with build status badges), git repos, settings, work items, and more
+- **Azure Data Explorer** – updates the page title on dashboards to include the active page name (e.g. `Page → Dashboard Name`)
 
 ### [ms-tab-lock](./ms-tab-lock/)
 
@@ -22,6 +23,21 @@ Lock a tab so that closing it (Ctrl+W, middle-click, close button, etc.) immedia
 
 #### Installation (Edge)
 
+**From the Edge Add-ons Store** (recommended):
+
+- [MS QoL Improvements](#) <!-- TODO: replace with store link after publishing -->
+- [Tab Lock](#) <!-- TODO: replace with store link after publishing -->
+
+**Manual (developer mode):**
+
 1. Open `edge://extensions/`
 2. Enable **Developer mode**
-3. Click **Load unpacked** and select the extension directory (e.g. `ms-favicon` or `ms-tab-lock`)
+3. Click **Load unpacked** and select the extension directory (e.g. `ms-qol-improvements` or `ms-tab-lock`)
+
+## Privacy
+
+See [PRIVACY.md](./PRIVACY.md). These extensions do not collect or transmit any data.
+
+## License
+
+[MIT](./LICENSE)

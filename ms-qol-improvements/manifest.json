@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "MS QoL Improvements",
+  "version": "1.0.0",
+  "description": "Quality-of-life improvements for Microsoft web apps: context-aware favicons, better page titles, and more",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.portal.azure.com/*",
+        "https://portal.azure.com/*"
+      ],
+      "js": ["lib/wait-for-elm.js", "lib/set-favicon.js", "content-scripts/azure-portal.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://dev.azure.com/*",
+        "https://*.visualstudio.com/*"
+      ],
+      "js": ["lib/wait-for-elm.js", "lib/set-favicon.js", "lib/add-badge.js", "content-scripts/ado.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://dataexplorer.azure.com/dashboards/*"
+      ],
+      "js": ["lib/wait-for-elm.js", "content-scripts/data-explorer.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

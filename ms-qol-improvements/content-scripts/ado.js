@@ -34,62 +34,12 @@ class AdoInfo {
     IsWorkItemDetails() { return (/_workitems\/edit\//).test(this.#url.pathname); }
 }
 
-function waitForElm(selector) {
-    return new Promise(resolve => {
-        if (document.querySelector(selector)) {
-            return resolve(document.querySelector(selector));
-        }
-        const observer = new MutationObserver(() => {
-            if (document.querySelector(selector)) {
-                resolve(document.querySelector(selector));
-                observer.disconnect();
-            }
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-    });
-}
-
 function determineDefaultAdoIcon() {
     try {
         return document.getElementsByClassName("displayed-container")[0].getElementsByTagName("img")[0].src;
     } catch {
         return null;
     }
-}
-
-async function withBadge(iconUrl, badgeText) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    await new Promise((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = reject;
-        img.src = iconUrl;
-    });
-
-    const size = Math.max(img.width, img.height);
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, size, size);
-
-    if (badgeText !== null) {
-        const text = badgeText.toString();
-        const len = text.length;
-        const scale = len === 1 ? 0.55 : len === 2 ? 0.45 : 0.35;
-        ctx.font = `bold ${size * scale}px sans-serif`;
-        ctx.textAlign = "right";
-        ctx.textBaseline = "bottom";
-        const padding = size * 0.08;
-        const x = size - padding;
-        const y = size - padding;
-        ctx.lineWidth = size * 0.12;
-        ctx.strokeStyle = "#000000";
-        ctx.strokeText(text, x, y);
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(text, x, y);
-    }
-    return canvas.toDataURL("image/png");
 }
 
 async function withPipelineStatusBadge(baseIconUrl) {
@@ -103,7 +53,7 @@ async function withPipelineStatusBadge(baseIconUrl) {
         status === "cancelled"  ? "⚪" :
         status === "canceled"   ? "⚪" :
         "?";
-    return withBadge(baseIconUrl, badge);
+    return addBadge(baseIconUrl, badge);
 }
 
 function svgTaskIcon(color) {
@@ -112,16 +62,6 @@ function svgTaskIcon(color) {
           <path d="m6.3586 2.8161h-0.45357q0-0.36853-0.26931-0.63783t-0.63784-0.26931-0.63784 0.26931-0.26931 0.63783h-1.3607v5.4429h4.5357v-5.4429zm-2.7214 0.45357h0.90714v-0.45357q0-0.18426 0.12757-0.31183 0.14174-0.14174 0.326-0.14174 0.18426 0 0.31183 0.14174 0.14174 0.12757 0.14174 0.31183v0.45357h0.90714v0.45357h-2.7214zm0.79375 4.0821-1.1339-1.1339 0.45357-0.45357 0.68036 0.68036 1.8143-1.8143 0.45357 0.45357z"/>
         </svg>`;
     return 'data:image/svg+xml;base64,' + btoa(svg);
-}
-
-function setFavicon(url) {
-    let favIcon = document.querySelector("link[rel~='icon']");
-    if (!favIcon) {
-        favIcon = document.createElement('link');
-        favIcon.rel = 'icon';
-        document.head.appendChild(favIcon);
-    }
-    favIcon.href = url;
 }
 
 async function getWorkItemIconColor() {
