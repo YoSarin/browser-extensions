@@ -10,17 +10,163 @@ function isLockableUrl(url) {
   return !UNSUPPORTED_SCHEMES.some((scheme) => url.startsWith(scheme));
 }
 
+// --- Persistence helpers ---
+
+async function saveLocks() {
+  const data = Object.fromEntries(lockedTabs);
+  await chrome.storage.session.set({ lockedTabs: data });
+}
+
+async function restoreLocks() {
+  const result = await chrome.storage.session.get("lockedTabs");
+  const data = result.lockedTabs;
+  if (!data) return;
+  for (const [tabIdStr, lock] of Object.entries(data)) {
+    const tabId = Number(tabIdStr);
+    try {
+      await chrome.tabs.get(tabId);
+      lockedTabs.set(tabId, lock);
+      setBadgeLocked(tabId);
+    } catch {
+      // Tab no longer exists — skip
+    }
+  }
+}
+
+// Restore locks when service worker starts
+restoreLocks();
+
+// --- Favicon badge (injected into tab context, must be self-contained) ---
+
+async function _injectFaviconBadge() {
+  const SIZE = 32;
+  const EMOJI_SIZE = 14;
+
+  if (window._lockFaviconObserver) {
+    window._lockFaviconObserver.disconnect();
+  }
+
+  function getIconLink() {
+    let link = document.querySelector('link[rel~="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      link.href = `${location.origin}/favicon.ico`;
+      document.head.appendChild(link);
+    }
+    return link;
+  }
+
+  async function applyBadge() {
+    const link = getIconLink();
+    const currentHref = link.href;
+
+    // Skip if we already badged this exact href
+    if (currentHref === window._lockLastSetHref) return;
+
+    window._lockLastSourceHref = currentHref;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext("2d");
+
+    try {
+      let imgSrc = currentHref;
+      if (!currentHref.startsWith("data:")) {
+        const resp = await fetch(currentHref);
+        if (!resp.ok) throw new Error();
+        const blob = await resp.blob();
+        imgSrc = URL.createObjectURL(blob);
+      }
+      try {
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = imgSrc;
+        });
+        ctx.drawImage(img, 0, 0, SIZE, SIZE);
+      } finally {
+        if (imgSrc !== currentHref) URL.revokeObjectURL(imgSrc);
+      }
+    } catch {
+      // Badge drawn on transparent background
+    }
+
+    ctx.font = `${EMOJI_SIZE}px sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("\u{1F512}", 0, 0);
+
+    const dataUrl = canvas.toDataURL("image/png");
+    window._lockLastSetHref = dataUrl;
+    link.href = dataUrl;
+  }
+
+  const observer = new MutationObserver(() => {
+    const link = document.querySelector('link[rel~="icon"]');
+    if (link && link.href !== window._lockLastSetHref) {
+      applyBadge();
+    }
+  });
+
+  observer.observe(document.head, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["href"],
+  });
+
+  window._lockFaviconObserver = observer;
+  await applyBadge();
+}
+
+function _clearFaviconBadge() {
+  if (window._lockFaviconObserver) {
+    window._lockFaviconObserver.disconnect();
+    window._lockFaviconObserver = null;
+  }
+
+  // Restore the pre-badge favicon
+  if (window._lockLastSourceHref) {
+    const link = document.querySelector('link[rel~="icon"]');
+    if (link) link.href = window._lockLastSourceHref;
+  }
+
+  window._lockLastSourceHref = null;
+  window._lockLastSetHref = null;
+}
+
+// --- Favicon badge wrappers (background context) ---
+
+function applyFaviconBadge(tabId) {
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: _injectFaviconBadge,
+  }).catch(() => {});
+}
+
+function removeFaviconBadge(tabId) {
+  chrome.scripting.executeScript({
+    target: { tabId },
+    func: _clearFaviconBadge,
+  }).catch(() => {});
+}
+
 // --- Badge helpers ---
 
 function setBadgeLocked(tabId) {
   chrome.action.setBadgeText({ text: "L", tabId });
   chrome.action.setBadgeBackgroundColor({ color: "#e53935", tabId });
   chrome.action.setTitle({ title: "Tab is locked – click to unlock (Alt+L)", tabId });
+  applyFaviconBadge(tabId);
 }
 
 function setBadgeUnlocked(tabId) {
   chrome.action.setBadgeText({ text: "", tabId });
   chrome.action.setTitle({ title: "Click to lock this tab (Alt+L)", tabId });
+  removeFaviconBadge(tabId);
 }
 
 // --- Snapshot current tab state ---
@@ -43,11 +189,13 @@ async function lockTab(tabId) {
   if (!isLockableUrl(snap.url)) return;
   lockedTabs.set(tabId, snap);
   setBadgeLocked(tabId);
+  await saveLocks();
 }
 
 function unlockTab(tabId) {
   lockedTabs.delete(tabId);
   setBadgeUnlocked(tabId);
+  saveLocks();
 }
 
 // --- Toggle on action click ---
@@ -67,6 +215,7 @@ chrome.tabs.onMoved.addListener((tabId, moveInfo) => {
   if (!lock) return;
   lock.index = moveInfo.toIndex;
   lock.windowId = moveInfo.windowId ?? lock.windowId;
+  saveLocks();
 });
 
 chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
@@ -74,6 +223,7 @@ chrome.tabs.onAttached.addListener((tabId, attachInfo) => {
   if (!lock) return;
   lock.windowId = attachInfo.newWindowId;
   lock.index = attachInfo.newPosition;
+  saveLocks();
 });
 
 chrome.tabs.onDetached.addListener((tabId, _detachInfo) => {
@@ -82,12 +232,16 @@ chrome.tabs.onDetached.addListener((tabId, _detachInfo) => {
   void _detachInfo;
 });
 
-// Update pinned state
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, _tab) => {
   const lock = lockedTabs.get(tabId);
   if (!lock) return;
   if (changeInfo.pinned !== undefined) {
     lock.pinned = changeInfo.pinned;
+    saveLocks();
+  }
+  // Re-apply badge after page reload / navigation
+  if (changeInfo.status === "complete") {
+    setBadgeLocked(tabId);
   }
 });
 
@@ -100,7 +254,10 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
   lockedTabs.delete(tabId);
 
   // Don't reopen if the whole window is closing (browser shutdown / window close)
-  if (removeInfo.isWindowClosing) return;
+  if (removeInfo.isWindowClosing) {
+    await saveLocks();
+    return;
+  }
 
   // Guard against duplicate replacement
   const key = `${lock.windowId}:${lock.url}`;
@@ -130,7 +287,6 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
       }
     }
 
-    // Re-lock the new tab
     lockedTabs.set(newTab.id, {
       url: lock.url,
       windowId: newTab.windowId,
@@ -139,6 +295,7 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) => {
       groupId: lock.groupId,
     });
     setBadgeLocked(newTab.id);
+    await saveLocks();
   } finally {
     replacingLocks.delete(key);
   }
