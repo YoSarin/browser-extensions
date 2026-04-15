@@ -1,0 +1,23 @@
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node (for any future build tooling)
+node_modules/
+npm-debug.log*
+
+# Package archives
+*.zip
+*.crx
+*.xpi
+
+# Extension signing keys
+*.pem
