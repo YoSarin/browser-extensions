@@ -97,6 +97,24 @@ function listenForAttributeChange(selector) {
     }).observe(target, { attributes: true });
 }
 
+async function addPipelineSourceLink() {
+    const yamlHeader = document.querySelector(".ci-yaml-editor-header");
+    if (!yamlHeader || yamlHeader.querySelector("a")) return;
+
+    const yamlPath = yamlHeader.querySelector(".editable-path-container")?.textContent;
+    const yamlRepository = yamlHeader.querySelector(".repository-name")?.textContent;
+    const branchInput = await waitForElm("input", yamlHeader);
+    const yamlBranch = branchInput.value;
+    if (!yamlPath || !yamlRepository || !yamlBranch) return;
+
+    const pageInfo = new AdoInfo(window.location.href);
+    const baseUrl = "https://dev.azure.com/" + pageInfo.OrganizationName() + "/" + pageInfo.ProjectName();
+    const url = baseUrl + "/_git/" + yamlRepository + "?path=" + yamlPath + "&version=GB" + yamlBranch;
+
+    const parent = yamlHeader.querySelector(".repository-name").parentNode;
+    parent.innerHTML = '<a href="' + url + '">' + parent.innerHTML + '</a>';
+}
+
 (function () {
     'use strict';
 
@@ -106,8 +124,10 @@ function listenForAttributeChange(selector) {
         if (url !== lastUrl) {
             lastUrl = url;
             modifyIcon();
+            addPipelineSourceLink();
         }
     }).observe(document, { subtree: true, childList: true });
 
     modifyIcon();
+    addPipelineSourceLink();
 })();

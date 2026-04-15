@@ -1,11 +1,11 @@
-/** Resolves when an element matching `selector` appears in the DOM. */
-function waitForElm(selector) {
+/** Resolves when an element matching `selector` appears in the DOM (or within `parent`). */
+function waitForElm(selector, parent = document) {
     return new Promise(resolve => {
-        const existing = document.querySelector(selector);
+        const existing = parent.querySelector(selector);
         if (existing) return resolve(existing);
 
         const observer = new MutationObserver(() => {
-            const el = document.querySelector(selector);
+            const el = parent.querySelector(selector);
             if (el) {
                 observer.disconnect();
                 resolve(el);

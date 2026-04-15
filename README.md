@@ -9,7 +9,7 @@ A collection of browser extensions, primarily targeting Microsoft Edge.
 Quality-of-life improvements for Microsoft web apps:
 
 - **Azure Portal** – replaces the generic favicon with the SVG icon of the currently active blade
-- **Azure DevOps** – sets context-aware favicons for pipelines (with build status badges), git repos, settings, work items, and more
+- **Azure DevOps** – sets context-aware favicons for pipelines (with build status badges), git repos, settings, work items, and more; adds a clickable link from the pipeline YAML header to its source file in the repo
 - **Azure Data Explorer** – updates the page title on dashboards to include the active page name (e.g. `Page → Dashboard Name`)
 
 ### [ms-tab-lock](./ms-tab-lock/)
